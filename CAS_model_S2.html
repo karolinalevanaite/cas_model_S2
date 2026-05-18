@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="https://cdn.plot.ly/plotly-latest.min.js">
+
+    // ================= SCENARIO 2 – STEP 2 =================
+
+    const BLUE = "#0066ff";
+
+    // ---- Persistent activation state ----
+    let persistentColors = nodes.map(n => n.color);
+    let persistentSizes  = nodes.map(() => 8);
+
+
+
+    const phaseA = [
+      "Socio-political Factors",
+      "Cultural and Linguistic Diversity",
+      "Communication"
+    ];
+
+    const phaseB = [
+      "Translation",
+      "Translator",
+      "Industry",
+      "Technologies"
+    ];
+
+    let scenarioStartTime = null;
+    let lockedColors = null;
+    let lockedSizes = null;
+
+    function lerpColor(a,b,t){
+      const ah=parseInt(a.replace("#",""),16),
+      ar=ah>>16,ag=ah>>8&0xff,ab=ah&0xff,
+      bh=parseInt(b.replace("#",""),16),
+      br=bh>>16,bg=bh>>8&0xff,bb=bh&0xff,
+      rr=ar+t*(br-ar),
+      rg=ag+t*(bg-ag),
+      rb=ab+t*(bb-ab);
+      return "#" + (((1<<24)+(rr<<16)+(rg<<8)+rb)|0).toString(16).slice(1);
+    }
+
+    function startScenario(){
+      requestAnimationFrame(runScenario);
+    }
+
+    function runScenario(ts){
+      if(!scenarioStartTime) scenarioStartTime = ts;
+      const t = (ts - scenarioStartTime)/1000;
+
+      let colors = lockedColors ? [...lockedColors] : nodes.map(n=>n.color);
+      let sizes  = lockedSizes  ? [...lockedSizes]  : nodes.map(()=>8);
+
+      // 0–3 seconds: activate phaseA nodes
+      if(t < 3){
+        const p = t/3;
+        nodes.forEach((n,i)=>{
+          if(phaseA.includes(n.id)){
+            colors[i] = lerpColor(n.color, BLUE, p);
+            sizes[i] = 8 + 8*p;
+          }
+        });
+      }
+
+      // 3–10 seconds: activate connecting lines + phaseB nodes
+      if(t >= 3 && t < 10){
+        const p = (t-3)/7;
+
+        nodes.forEach((n,i)=>{
+          if(phaseA.includes(n.id)){
+            colors[i] = BLUE;
+            sizes[i] = 16;
+          }
+          if(phaseB.includes(n.id)){
+            colors[i] = lerpColor(n.color, BLUE, p);
+            sizes[i] = 8 + 8*p;
+          }
+        });
+
+        edges.forEach((e,i)=>{
+          const [a,b] = e;
+
+          
+          const shouldActivate =
+            // PhaseA → PhaseB
+            (phaseA.includes(a) && phaseB.includes(b)) ||
+            (phaseA.includes(b) && phaseB.includes(a)) ||
+
+            // Socio-political → Cultural & Communication
+            (a === "Socio-political Factors" && 
+               ["Cultural and Linguistic Diversity","Communication"].includes(b)) ||
+            (b === "Socio-political Factors" && 
+               ["Cultural and Linguistic Diversity","Communication"].includes(a));
+    
+
+          if(shouldActivate){
+            const c = lerpColor("#ccc", BLUE, p);
+            const w = 0.5 + p; // up to double thickness
+            Plotly.restyle("plot",
+              {"line.color":c,"line.width":w},
+              i + layerPlanes.length
+            );
+          }
+        });
+      }
+
+      lockedColors = colors;
+      lockedSizes = sizes;
+
+      persistentColors = colors;
+      persistentSizes = sizes;
+
+      Plotly.restyle("plot",{
+        "marker.color":[colors],
+        "marker.size":[sizes]
+      }, layerPlanes.length + edgeTraces.length);
+
+      if(t < 10){
+        requestAnimationFrame(runScenario);
+      }
+    }
+
+    // Start Step 2 after freeze (11s)
+    setTimeout(startScenario, 11000);
+
+
+
+
+    // ================= SCENARIO 2 – STEP 3 =================
+
+    const phaseC = [
+      "Translation",
+      "Translator",
+      "Industry",
+      "Technologies"
+    ];
+
+    const phaseD = [
+      "Human-in-the-loop",
+      "Ethics"
+    ];
+
+    let step3StartTime = null;
+
+    function startStep3(){
+      requestAnimationFrame(runStep3);
+    }
+
+    function runStep3(ts){
+      if(!step3StartTime) step3StartTime = ts;
+      const t = (ts - step3StartTime)/1000;
+
+      let colors = [...persistentColors];
+      let sizes  = [...persistentSizes];
+
+      // 0–3s: phaseC nodes double (reinforce activation)
+      if(t < 3){
+        const p = t/3;
+        nodes.forEach((n,i)=>{
+          if(phaseC.includes(n.id)){
+            colors[i] = BLUE;
+            sizes[i] = 16;  // double again visually
+          }
+        });
+      }
+
+      // 3–8s: lines to Human-in-the-loop & Ethics activate
+      if(t >= 3 && t < 8){
+        const p = (t-3)/5;
+
+        edges.forEach((e,i)=>{
+          const [a,b] = e;
+
+          const activate =
+            (phaseC.includes(a) && phaseD.includes(b)) ||
+            (phaseC.includes(b) && phaseD.includes(a));
+
+          if(activate){
+            const c = lerpColor("#ccc", BLUE, p);
+            const w = 0.5 + p;
+            Plotly.restyle("plot",
+              {"line.color":c,"line.width":w},
+              i + layerPlanes.length
+            );
+          }
+        });
+      }
+
+      // 8–11s: Human-in-the-loop & Ethics activate
+      if(t >= 8 && t < 11){
+        const p = (t-8)/3;
+        nodes.forEach((n,i)=>{
+          if(phaseD.includes(n.id)){
+            colors[i] = lerpColor(n.color, BLUE, p);
+            sizes[i] = 8 + 8*p;
+          }
+        });
+      }
+
+      persistentColors = colors;
+      persistentSizes = sizes;
+
+      Plotly.restyle("plot",{
+        "marker.color":[colors],
+        "marker.size":[sizes]
+      }, layerPlanes.length + edgeTraces.length);
+
+      if(t < 11){
+        requestAnimationFrame(runStep3);
+      }
+    }
+
+    // Start Step3 after Step2 (11s freeze + 10s Step2)
+    setTimeout(startStep3, 21000);
+
+
+
+
+    // ================= SCENARIO 2 – STEP 4 (RESUME ROTATION) =================
+
+    function resumeRotation(){
+      rotationInterval = setInterval(() => {
+        theta += 0.01;
+        phi += 0.02;
+
+        const R = 0.8;
+        const r = 0.4;
+
+        const camera = {
+          eye: {
+            x: (R + r * Math.cos(phi)) * Math.cos(theta),
+            y: (R + r * Math.cos(phi)) * Math.sin(theta),
+            z: r * Math.sin(phi) + 0.5
+          }
+        };
+
+        Plotly.relayout("plot", { "scene.camera": camera });
+      }, 50);
+    }
+
+    // Resume after Step3 completes (~32 seconds total)
+    setTimeout(resumeRotation, 32000);
+
+
+</script>
+  <title>CAS Model - Updated with Human-in-the-loop (Torus Animation - Close View)</title>
+</head>
+<body>
+  <div id="plot" style="width: 100%; height: 100vh;"></div>
+  <script>
+    const scale = 3;
+
+    const nodes = [
+      { id: "Translation", x: 0, y: 0, z: 0, color: '#1f77b4' },
+      { id: "Translator", x: 3, y: 0, z: 0, color: '#1f77b4' },
+      { id: "Translator's Work", x: 1.5, y: 2.6, z: 0, color: '#1f77b4' },
+      { id: "Technologies", x: 2, y: 0.5, z: 1, color: '#ff7f0e' },
+      { id: "Industry", x: 2, y: -0.5, z: 1, color: '#ff7f0e' },
+      { id: "Cultural and Linguistic Diversity", x: -1, y: 0.5, z: 1, color: '#2ca02c' },
+      { id: "Communication", x: 0, y: 2, z: 1, color: '#d62728' },
+      { id: "Education", x: 1, y: 2, z: 1, color: '#d62728' },
+      { id: "Economic Factors", x: 3.5, y: 0, z: 2, color: '#9467bd' },
+      { id: "Socio-political Factors", x: -2, y: 0, z: 2, color: '#8c564b' },
+
+      // Left vertical (competence) layer
+      { id: "Personal and Interpersonal Competence", x: -2, y: 0, z: 0.5, color: '#17becf' },
+      { id: "Competence in Culture and Language", x: -2, y: 1, z: 0.7, color: '#17becf' },
+      { id: "Service Provision Competence", x: -2, y: -1, z: 1, color: '#17becf' },
+      { id: "Technological Competence", x: -2, y: 1.5, z: 1.5, color: '#17becf' },
+      { id: "Translation Competence", x: -2, y: -1.5, z: 1.7, color: '#17becf' },
+      { id: "Personal Dispositions", x: -2, y: 0.5, z: 1.3, color: '#17becf' },
+      { id: "Other Competences", x: -2, y: -0.5, z: 0.2, color: '#17becf' },
+
+      // Right vertical layer
+      { id: "Risk", x: 6, y: 0, z: 0.5, color: '#bcbd22' },
+      { id: "Ethics", x: 6, y: 1, z: 0.7, color: '#bcbd22' },
+      { id: "Perception", x: 6, y: 0.5, z: 1.3, color: '#bcbd22' },
+      { id: "Human-in-the-loop", x: 6, y: -0.5, z: 1.5, color: '#bcbd22' }
+    ].map(n => ({
+      ...n,
+      x: n.x * scale,
+      y: n.y * scale,
+      z: n.z * scale
+    }));
+
+    const competenceIds = nodes.filter(n => n.color === '#17becf').map(n => n.id);
+    const riskLayerIds = nodes.filter(n => n.color === '#bcbd22').map(n => n.id);
+    const baseAgents = ["Translation", "Translator", "Translator's Work"];
+    const topAgents = ["Economic Factors", "Socio-political Factors"];
+    const human = "Human-in-the-loop";
+
+    const edges = [
+      ["Translation", "Translator"], ["Translation", "Translator's Work"], ["Translator", "Translator's Work"],
+      ["Technologies", "Industry"], ["Technologies", "Cultural and Linguistic Diversity"],
+      ["Industry", "Cultural and Linguistic Diversity"], ["Communication", "Technologies"],
+      ["Communication", "Industry"], ["Communication", "Cultural and Linguistic Diversity"],
+      ["Education", "Technologies"], ["Education", "Industry"], ["Education", "Cultural and Linguistic Diversity"],
+      ...["Technologies", "Industry", "Cultural and Linguistic Diversity", "Communication", "Education"].flatMap(n =>
+        baseAgents.map(t => [n, t])
+      ),
+      ["Economic Factors", "Socio-political Factors"],
+      ["Economic Factors", "Technologies"], ["Economic Factors", "Industry"],
+      ["Socio-political Factors", "Cultural and Linguistic Diversity"],
+
+      ["Socio-political Factors", "Economic Factors"],
+      ["Socio-political Factors", "Communication"],
+      ["Socio-political Factors", "Industry"],
+
+
+      // Competence interconnections and links
+      ...competenceIds.flatMap(c1 => competenceIds.map(c2 => c1 !== c2 ? [c1, c2] : null)).filter(Boolean),
+      ...competenceIds.flatMap(c => baseAgents.map(t => [c, t])),
+
+      // Risk layer interconnections
+      ...riskLayerIds.flatMap(r1 => riskLayerIds.map(r2 => r1 !== r2 ? [r1, r2] : null)).filter(Boolean),
+      ...riskLayerIds.flatMap(r =>
+        [...topAgents, ...competenceIds, ...baseAgents].map(other => [r, other])
+      ),
+
+      // Human-in-the-loop connections
+      ...["Risk", "Ethics", "Perception", "Economic Factors", "Industry", "Technologies", ...baseAgents].map(a => [human, a])
+    ];
+
+    const edgeTraces = edges.map(([src, tgt]) => {
+      const from = nodes.find(n => n.id === src);
+      const to = nodes.find(n => n.id === tgt);
+      return {
+        type: "scatter3d",
+        mode: "lines",
+        x: [from.x, to.x],
+        y: [from.y, to.y],
+        z: [from.z, to.z],
+        line: { width: 0.5, color: "#ccc" },
+        hoverinfo: "none"
+      };
+    });
+
+    const nodeTrace = {
+      type: "scatter3d",
+      mode: "markers+text",
+      x: nodes.map(n => n.x),
+      y: nodes.map(n => n.y),
+      z: nodes.map(n => n.z),
+      marker: { size: 8, color: nodes.map(n => n.color) },
+      text: nodes.map(n => n.id),
+      textposition: "top center",
+      hoverinfo: "text"
+    };
+
+    function circularPlane(center, radius, resolution, axis, color) {
+      const theta = [...Array(resolution).keys()].map(i => (2 * Math.PI * i) / (resolution - 1));
+      const r = [...Array(resolution).keys()].map(i => (radius * i) / (resolution - 1));
+      const x = [], y = [], z = [];
+
+      for (let i = 0; i < r.length; i++) {
+        const rowX = [], rowY = [], rowZ = [];
+        for (let j = 0; j < theta.length; j++) {
+          const xi = r[i] * Math.cos(theta[j]);
+          const yi = r[i] * Math.sin(theta[j]);
+          if (axis === 'z') {
+            rowX.push(center[0] + xi);
+            rowY.push(center[1] + yi);
+            rowZ.push(center[2]);
+          } else if (axis === 'x') {
+            rowX.push(center[0]);
+            rowY.push(center[1] + xi);
+            rowZ.push(center[2] + yi);
+          }
+        }
+        x.push(rowX);
+        y.push(rowY);
+        z.push(rowZ);
+      }
+
+      return {
+        type: "surface",
+        x, y, z,
+        opacity: 0.08,
+        showscale: false,
+        colorscale: [[0, color], [1, color]],
+        hoverinfo: "none"
+      };
+    }
+
+    const layerPlanes = [
+      circularPlane([1.5 * scale, 1.3 * scale, 0], 4.5 * scale, 50, "z", "blue"),
+      circularPlane([1.5 * scale, 1.3 * scale, 3], 4.5 * scale, 50, "z", "orange"),
+      circularPlane([1.5 * scale, 1.3 * scale, 6], 4.5 * scale, 50, "z", "purple"),
+      circularPlane([-6 * scale, 3 * scale, 3], 2.5 * scale, 50, "x", "cyan"),
+      circularPlane([6 * scale, 3 * scale, 3], 2.5 * scale, 50, "x", "yellow")
+    ];
+
+    Plotly.newPlot("plot", [...layerPlanes, ...edgeTraces, nodeTrace], {
+      margin: { l: 0, r: 0, b: 0, t: 0 },
+      scene: {
+        xaxis: { visible: false },
+        yaxis: { visible: false },
+        zaxis: { visible: false }
+      }
+    });
+
+    
+    // 🔄 Controlled rotation loop
+    let theta = 0;
+    let phi = 0;
+    let rotationInterval = null;
+
+    function startRotation(){
+      rotationInterval = setInterval(() => {
+        theta += 0.01;
+        phi += 0.02;
+
+        const R = 0.8;
+        const r = 0.4;
+
+        const camera = {
+          eye: {
+            x: (R + r * Math.cos(phi)) * Math.cos(theta),
+            y: (R + r * Math.cos(phi)) * Math.sin(theta),
+            z: r * Math.sin(phi) + 0.5
+          }
+        };
+
+        Plotly.relayout("plot", { "scene.camera": camera });
+      }, 50);
+    }
+
+    startRotation();
+
+    // Freeze completely after 11 seconds
+    setTimeout(() => {
+      clearInterval(rotationInterval);
+    }, 11000);
+
+  
+
+    // ================= SCENARIO 2 – STEP 2 =================
+
+    const BLUE = "#0066ff";
+
+    // ---- Persistent activation state ----
+    let persistentColors = nodes.map(n => n.color);
+    let persistentSizes  = nodes.map(() => 8);
+
+
+
+    const phaseA = [
+      "Socio-political Factors",
+      "Cultural and Linguistic Diversity",
+      "Communication"
+    ];
+
+    const phaseB = [
+      "Translation",
+      "Translator",
+      "Industry",
+      "Technologies"
+    ];
+
+    let scenarioStartTime = null;
+    let lockedColors = null;
+    let lockedSizes = null;
+
+    function lerpColor(a,b,t){
+      const ah=parseInt(a.replace("#",""),16),
+      ar=ah>>16,ag=ah>>8&0xff,ab=ah&0xff,
+      bh=parseInt(b.replace("#",""),16),
+      br=bh>>16,bg=bh>>8&0xff,bb=bh&0xff,
+      rr=ar+t*(br-ar),
+      rg=ag+t*(bg-ag),
+      rb=ab+t*(bb-ab);
+      return "#" + (((1<<24)+(rr<<16)+(rg<<8)+rb)|0).toString(16).slice(1);
+    }
+
+    function startScenario(){
+      requestAnimationFrame(runScenario);
+    }
+
+    function runScenario(ts){
+      if(!scenarioStartTime) scenarioStartTime = ts;
+      const t = (ts - scenarioStartTime)/1000;
+
+      let colors = lockedColors ? [...lockedColors] : nodes.map(n=>n.color);
+      let sizes  = lockedSizes  ? [...lockedSizes]  : nodes.map(()=>8);
+
+      // 0–3 seconds: activate phaseA nodes
+      if(t < 3){
+        const p = t/3;
+        nodes.forEach((n,i)=>{
+          if(phaseA.includes(n.id)){
+            colors[i] = lerpColor(n.color, BLUE, p);
+            sizes[i] = 8 + 8*p;
+          }
+        });
+      }
+
+      // 3–10 seconds: activate connecting lines + phaseB nodes
+      if(t >= 3 && t < 10){
+        const p = (t-3)/7;
+
+        nodes.forEach((n,i)=>{
+          if(phaseA.includes(n.id)){
+            colors[i] = BLUE;
+            sizes[i] = 16;
+          }
+          if(phaseB.includes(n.id)){
+            colors[i] = lerpColor(n.color, BLUE, p);
+            sizes[i] = 8 + 8*p;
+          }
+        });
+
+        edges.forEach((e,i)=>{
+          const [a,b] = e;
+
+          
+          const shouldActivate =
+            // PhaseA → PhaseB
+            (phaseA.includes(a) && phaseB.includes(b)) ||
+            (phaseA.includes(b) && phaseB.includes(a)) ||
+
+            // Socio-political → Cultural & Communication
+            (a === "Socio-political Factors" && 
+               ["Cultural and Linguistic Diversity","Communication"].includes(b)) ||
+            (b === "Socio-political Factors" && 
+               ["Cultural and Linguistic Diversity","Communication"].includes(a));
+    
+
+          if(shouldActivate){
+            const c = lerpColor("#ccc", BLUE, p);
+            const w = 0.5 + p; // up to double thickness
+            Plotly.restyle("plot",
+              {"line.color":c,"line.width":w},
+              i + layerPlanes.length
+            );
+          }
+        });
+      }
+
+      lockedColors = colors;
+      lockedSizes = sizes;
+
+      persistentColors = colors;
+      persistentSizes = sizes;
+
+      Plotly.restyle("plot",{
+        "marker.color":[colors],
+        "marker.size":[sizes]
+      }, layerPlanes.length + edgeTraces.length);
+
+      if(t < 10){
+        requestAnimationFrame(runScenario);
+      }
+    }
+
+    // Start Step 2 after freeze (11s)
+    setTimeout(startScenario, 11000);
+
+
+
+
+    // ================= SCENARIO 2 – STEP 3 =================
+
+    const phaseC = [
+      "Translation",
+      "Translator",
+      "Industry",
+      "Technologies"
+    ];
+
+    const phaseD = [
+      "Human-in-the-loop",
+      "Ethics"
+    ];
+
+    let step3StartTime = null;
+
+    function startStep3(){
+      requestAnimationFrame(runStep3);
+    }
+
+    function runStep3(ts){
+      if(!step3StartTime) step3StartTime = ts;
+      const t = (ts - step3StartTime)/1000;
+
+      let colors = [...persistentColors];
+      let sizes  = [...persistentSizes];
+
+      // 0–3s: phaseC nodes double (reinforce activation)
+      if(t < 3){
+        const p = t/3;
+        nodes.forEach((n,i)=>{
+          if(phaseC.includes(n.id)){
+            colors[i] = BLUE;
+            sizes[i] = 16;  // double again visually
+          }
+        });
+      }
+
+      // 3–8s: lines to Human-in-the-loop & Ethics activate
+      if(t >= 3 && t < 8){
+        const p = (t-3)/5;
+
+        edges.forEach((e,i)=>{
+          const [a,b] = e;
+
+          const activate =
+            (phaseC.includes(a) && phaseD.includes(b)) ||
+            (phaseC.includes(b) && phaseD.includes(a));
+
+          if(activate){
+            const c = lerpColor("#ccc", BLUE, p);
+            const w = 0.5 + p;
+            Plotly.restyle("plot",
+              {"line.color":c,"line.width":w},
+              i + layerPlanes.length
+            );
+          }
+        });
+      }
+
+      // 8–11s: Human-in-the-loop & Ethics activate
+      if(t >= 8 && t < 11){
+        const p = (t-8)/3;
+        nodes.forEach((n,i)=>{
+          if(phaseD.includes(n.id)){
+            colors[i] = lerpColor(n.color, BLUE, p);
+            sizes[i] = 8 + 8*p;
+          }
+        });
+      }
+
+      persistentColors = colors;
+      persistentSizes = sizes;
+
+      Plotly.restyle("plot",{
+        "marker.color":[colors],
+        "marker.size":[sizes]
+      }, layerPlanes.length + edgeTraces.length);
+
+      if(t < 11){
+        requestAnimationFrame(runStep3);
+      }
+    }
+
+    // Start Step3 after Step2 (11s freeze + 10s Step2)
+    setTimeout(startStep3, 21000);
+
+
+
+
+    // ================= SCENARIO 2 – STEP 4 (RESUME ROTATION) =================
+
+    function resumeRotation(){
+      rotationInterval = setInterval(() => {
+        theta += 0.01;
+        phi += 0.02;
+
+        const R = 0.8;
+        const r = 0.4;
+
+        const camera = {
+          eye: {
+            x: (R + r * Math.cos(phi)) * Math.cos(theta),
+            y: (R + r * Math.cos(phi)) * Math.sin(theta),
+            z: r * Math.sin(phi) + 0.5
+          }
+        };
+
+        Plotly.relayout("plot", { "scene.camera": camera });
+      }, 50);
+    }
+
+    // Resume after Step3 completes (~32 seconds total)
+    setTimeout(resumeRotation, 32000);
+
+
+</script>
+
+
+<!-- ================= YEAR COUNTER ================= -->
+
+<div id="yearCounter" style="
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  font-size: 44px;
+  font-weight: bold;
+  color: black;
+  font-family: Arial, sans-serif;
+  z-index: 9999;">
+  2025
+</div>
+
+<script>
+  let currentYear = 2025;
+  const yearElement = document.getElementById("yearCounter");
+
+  function updateYear(){
+    currentYear += 0.5; // smooth progression
+    yearElement.textContent = Math.floor(currentYear);
+  }
+
+  // update every 500ms for smooth visual change
+  setInterval(updateYear, 500);
+</script>
+
+
+</body>
+</html>
